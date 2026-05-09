@@ -32,11 +32,7 @@ The goal is a cleaner couch gaming experience without Windows bullshit services 
 
 ## Install
 
-Download `gaming-mode-win-x64.zip` from the latest release, extract it, then run:
-
-```text
-Setup.exe
-```
+Download `gaming-mode-win-x64.zip` from the latest release, extract it, then run Setup.exe
 
 The installer configures the companion app, local agent, shortcuts, startup modes, and required service preparation.
 
