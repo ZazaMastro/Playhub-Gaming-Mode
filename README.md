@@ -186,20 +186,3 @@ Or:
 
 Uninstall restores the standard Explorer shell, removes shortcuts, and removes
 installed files under `%LOCALAPPDATA%\GamingMode`.
-
-## Local API
-
-- `GET /health`
-- `GET /status`
-- `POST /mode/gaming`
-- `POST /mode/desktop`
-- `POST /mode/gaming/switch`
-- `POST /mode/desktop/switch`
-- `POST /mode/gaming/restart`
-- `POST /mode/desktop/restart`
-- `POST /default/gaming`
-- `POST /default/desktop`
-- `POST /restart/steam`
-- `POST /restart/decky`
-- `POST /cursor/autohide/start`
-- `POST /cursor/autohide/stop`
