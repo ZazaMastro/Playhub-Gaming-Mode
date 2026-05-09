@@ -7,25 +7,20 @@ PC. It keeps the current Windows user account and switches between two shells:
 - Gaming Mode: a controller-first Steam Big Picture session with Sunshine and
   Decky Loader prepared before Steam starts (so you can also turn on your PC and stream it wherever you want with Moonlight).
 
-The goal is a cleaner couch gaming experience without creating a second Windows
-user, replacing the operating system, or disabling the services required by
-games, controllers, streaming, audio, and drivers.
+The goal is a cleaner couch gaming experience without bullshit Microsoft services (except for the gaming ones obviously).
 
 ## Features
 
-- Graphical installer and companion app.
-- Clean mode switching through sign-out/sign-in.
-- Per-user shell switching: Explorer for Desktop Mode, `GamingMode.exe shell`
-  for Gaming Mode.
-- Steam Big Picture startup with Decky Loader launched first.
-- Sunshine startup and service preparation for Moonlight streaming.
+- a GUI installer and a Companion app.
+- Steam Big Picture startup with Decky Loader launched first to avoid loading issues.
+- Sunshine startup and service preparation for streaming.
 - Input compatibility preparation for HID, Bluetooth, GameInput, Xbox GIP,
   Steam Input, DirectInput, and `dinput8.dll` wrappers.
-- Idle mouse cursor hiding in Gaming Mode.
-- Experimental focus borderless fullscreen handling for foreground game windows.
+- Idle mouse cursor hiding in Gaming Mode (this is a cool one if you don't want that damn thing around when using a controller).
+- Focus borderless fullscreen handling for foreground game windows (similar to SteamOS / Bazzite Gaming Mode). Important system windows are out of this for obvious reasons.
 - Automatic cleanup of orphaned Decky Loader PyInstaller child processes.
-- Localhost API for the Decky companion plugin.
-- Shift-at-sign-in safety bypass to force Desktop Mode.
+- A Decky companion plugin to do everything with your gamepad.
+- Keep pressed the Shift key during sign-in to force Desktop Mode (just a security thing).
 
 ## Requirements
 
@@ -35,11 +30,6 @@ games, controllers, streaming, audio, and drivers.
 - Decky Loader for Windows, if the Decky plugin is used.
 - PowerShell 5 or newer.
 
-For development:
-
-- .NET SDK 10.0.x or compatible.
-- Node.js 24 or compatible.
-
 ## Install
 
 Download `gaming-mode-win-x64.zip` from the latest release, extract it, then run:
@@ -48,24 +38,31 @@ Download `gaming-mode-win-x64.zip` from the latest release, extract it, then run
 Setup.exe
 ```
 
-The installer configures the companion app, local agent, shortcuts, startup
-mode, and required service preparation. It does not install Decky Loader itself.
+The installer configures the companion app, local agent, shortcuts, startup modes, and required service preparation.
 
 If you use the Decky companion plugin, install `gaming-mode-decky.zip` manually
-through Decky Loader before using the plugin controls.
+through Decky Loader before using the plugin controls. 
+
+## How to install the plugin in DeckyLoader: 
+- Open Steam Big Picture 
+- Press CTRL + 2 / Home + B / PS + Circle
+- Select the electric plug icon on the bottom
+- Select the Setting icon on the top right of the menu
+- In General, scroll down and enable "Developer Mode"
+- Now in "Developer" select "Install from a ZIP file"
+- Search for the file `gaming-mode-decky.zip` in your PC and click Install 
 
 ## Usage
 
 Open `Gaming Mode` from the desktop shortcut or Start Menu.
 
-Main actions:
-
+Here you can:
 - Switch to Gaming Mode.
 - Switch to Desktop Mode.
 - Choose the default startup mode.
 
 Switching modes saves the destination shell and signs out. On the next sign-in,
-Windows starts the selected shell naturally.
+Windows will start the selected shell, that's it.
 
 Gaming Mode startup order:
 
@@ -73,7 +70,7 @@ Gaming Mode startup order:
 2. Sunshine.
 3. Decky Loader from `%USERPROFILE%\homebrew\services\PluginLoader_noconsole.exe`.
 4. Input compatibility services.
-5. Steam Big Picture / gamepad mode.
+5. Steam Big Picture.
 
 ## Safety
 
@@ -83,10 +80,9 @@ Gaming Mode is designed to be reversible:
 - Desktop Mode restores Explorer as the normal shell before sign-out.
 - Explorer is restored automatically if Steam cannot start.
 - A watchdog restores Desktop Mode if Steam disappears while Explorer is hidden.
-- The local API binds to `127.0.0.1` by default.
 
 Core Windows display, audio, networking, GPU, input, anti-cheat, and driver
-stacks are not disabled.
+stacks are not disabled for obvious reason.
 
 ## Configuration
 
@@ -174,6 +170,8 @@ Local install from source:
 
 ## Uninstall
 
+Open Setup.exe, select the language, skip the warning and select Uninstall (if it gives you an error just select Uninstall again and it will work)
+
 Run:
 
 ```text
@@ -187,8 +185,7 @@ Or:
 ```
 
 Uninstall restores the standard Explorer shell, removes shortcuts, and removes
-installed files under `%LOCALAPPDATA%\GamingMode`. It does not remove Steam,
-Sunshine, Decky Loader, or their settings.
+installed files under `%LOCALAPPDATA%\GamingMode`.
 
 ## Local API
 
@@ -206,9 +203,3 @@ Sunshine, Decky Loader, or their settings.
 - `POST /restart/decky`
 - `POST /cursor/autohide/start`
 - `POST /cursor/autohide/stop`
-
-## Status
-
-This is an early public version. It is intended for advanced Windows handheld,
-HTPC, and living-room PC setups where Steam Big Picture is the primary gaming
-interface.
