@@ -1,11 +1,11 @@
 # Playhub Gaming Mode
 
-Playhub Gaming Mode is a Steam-first console mode for a Windows 11 living-room
+Playhub Gaming Mode is a console mode for a Windows living-room
 PC. It keeps the current Windows user account and switches between two shells:
 
 - Desktop Mode: standard Windows desktop with Explorer.
 - Gaming Mode: a controller-first Steam Big Picture session with Sunshine and
-  Decky Loader prepared before Steam starts.
+  Decky Loader prepared before Steam starts (so you can also turn on your PC and stream it wherever you want with Moonlight).
 
 The goal is a cleaner couch gaming experience without creating a second Windows
 user, replacing the operating system, or disabling the services required by
