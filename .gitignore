@@ -1,0 +1,15 @@
+bin/
+obj/
+artifacts/
+publish/
+*.user
+*.suo
+.vs/
+.vscode/
+.github/workflows/*.yml
+node_modules/
+dist/
+*.zip
+*.log
+*.tmp
+coverage/

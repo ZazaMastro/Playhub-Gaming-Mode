@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GamingModeSetup/GamingModeSetup.csproj" />
+    <Project Path="src/GamingMode/GamingMode.csproj" />
+  </Folder>
+</Solution>
