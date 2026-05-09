@@ -3,11 +3,11 @@
 Playhub Gaming Mode is a console mode for a Windows living-room
 PC. It keeps the current Windows user account and switches between two shells:
 
-- Desktop Mode: standard Windows desktop with Explorer.
+- Desktop Mode: your normal Windows PC installation with no changes.
 - Gaming Mode: a controller-first Steam Big Picture session with Sunshine and
   Decky Loader prepared before Steam starts (so you can also turn on your PC and stream it wherever you want with Moonlight).
 
-The goal is a cleaner couch gaming experience without bullshit Microsoft services (except for the gaming ones obviously).
+The goal is a cleaner couch gaming experience without Windows bullshit services (except for the gaming ones obviously).
 
 ## Features
 
