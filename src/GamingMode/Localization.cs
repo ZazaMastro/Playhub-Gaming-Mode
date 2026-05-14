@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 
 namespace GamingMode;
 
@@ -131,111 +132,6 @@ public static class L
             ["status.noStatus"] = "O agente não devolveu estado.",
             ["error.unreachable"] = "Agente indisponível em localhost:47991.",
             ["error.unreadable"] = "Não foi possível ler a resposta do agente."
-        },
-        ["pt-BR"] = new()
-        {
-            ["app.title"] = "Gaming Mode",
-            ["action.gaming"] = "Mudar para o modo Gaming",
-            ["action.desktop"] = "Mudar para o modo Desktop",
-            ["default.startup"] = "Inicialização padrão",
-            ["desktop.mode"] = "Modo Desktop",
-            ["gaming.mode"] = "Modo Gaming",
-            ["config"] = "Config",
-            ["splash.logo"] = "Logo de inicialização",
-            ["agent.starting"] = "Iniciando agente local...",
-            ["agent.ready"] = "Agente pronto.",
-            ["agent.unreachable"] = "Agente indisponível em localhost:47991.",
-            ["status.current"] = "Atual",
-            ["status.default"] = "Padrão",
-            ["status.shell"] = "Shell",
-            ["status.ready"] = "Pronto.",
-            ["status.noStatus"] = "O agente não retornou um status.",
-            ["error.unreachable"] = "Agente indisponível em localhost:47991.",
-            ["error.unreadable"] = "Não foi possível ler a resposta do agente."
-        },
-        ["nl"] = new()
-        {
-            ["app.title"] = "Gaming Mode",
-            ["action.gaming"] = "Overschakelen naar Gaming Mode",
-            ["action.desktop"] = "Overschakelen naar Desktop Mode",
-            ["default.startup"] = "Standaard opstartmodus",
-            ["desktop.mode"] = "Desktop Mode",
-            ["gaming.mode"] = "Gaming Mode",
-            ["config"] = "Config",
-            ["splash.logo"] = "Opstartlogo",
-            ["agent.starting"] = "Lokale agent starten...",
-            ["agent.ready"] = "Agent gereed.",
-            ["agent.unreachable"] = "Agent is niet bereikbaar op localhost:47991.",
-            ["status.current"] = "Huidig",
-            ["status.default"] = "Standaard",
-            ["status.shell"] = "Shell",
-            ["status.ready"] = "Gereed.",
-            ["status.noStatus"] = "Agent heeft geen status teruggegeven.",
-            ["error.unreachable"] = "Agent is niet bereikbaar op localhost:47991.",
-            ["error.unreadable"] = "Agentantwoord kon niet worden gelezen."
-        },
-        ["uk"] = new()
-        {
-            ["app.title"] = "Gaming Mode",
-            ["action.gaming"] = "Перейти в ігровий режим",
-            ["action.desktop"] = "Перейти в режим робочого столу",
-            ["default.startup"] = "Запуск за замовчуванням",
-            ["desktop.mode"] = "Режим робочого столу",
-            ["gaming.mode"] = "Ігровий режим",
-            ["config"] = "Налаштування",
-            ["splash.logo"] = "Логотип запуску",
-            ["agent.starting"] = "Запуск локального агента...",
-            ["agent.ready"] = "Агент готовий.",
-            ["agent.unreachable"] = "Агент недоступний на localhost:47991.",
-            ["status.current"] = "Поточний",
-            ["status.default"] = "За замовчуванням",
-            ["status.shell"] = "Shell",
-            ["status.ready"] = "Готово.",
-            ["status.noStatus"] = "Агент не повернув стан.",
-            ["error.unreachable"] = "Агент недоступний на localhost:47991.",
-            ["error.unreadable"] = "Не вдалося прочитати відповідь агента."
-        },
-        ["zh"] = new()
-        {
-            ["app.title"] = "Gaming Mode",
-            ["action.gaming"] = "切换到游戏模式",
-            ["action.desktop"] = "切换到桌面模式",
-            ["default.startup"] = "默认启动模式",
-            ["desktop.mode"] = "桌面模式",
-            ["gaming.mode"] = "游戏模式",
-            ["config"] = "配置",
-            ["splash.logo"] = "启动标志",
-            ["agent.starting"] = "正在启动本地代理...",
-            ["agent.ready"] = "代理已就绪。",
-            ["agent.unreachable"] = "无法连接 localhost:47991 上的代理。",
-            ["status.current"] = "当前",
-            ["status.default"] = "默认",
-            ["status.shell"] = "Shell",
-            ["status.ready"] = "就绪。",
-            ["status.noStatus"] = "代理没有返回状态。",
-            ["error.unreachable"] = "无法连接 localhost:47991 上的代理。",
-            ["error.unreadable"] = "无法读取代理响应。"
-        },
-        ["ja"] = new()
-        {
-            ["app.title"] = "Gaming Mode",
-            ["action.gaming"] = "Gaming Mode に切り替え",
-            ["action.desktop"] = "Desktop Mode に切り替え",
-            ["default.startup"] = "既定の起動モード",
-            ["desktop.mode"] = "Desktop Mode",
-            ["gaming.mode"] = "Gaming Mode",
-            ["config"] = "設定",
-            ["splash.logo"] = "起動ロゴ",
-            ["agent.starting"] = "ローカルエージェントを起動中...",
-            ["agent.ready"] = "エージェントの準備ができました。",
-            ["agent.unreachable"] = "localhost:47991 のエージェントに接続できません。",
-            ["status.current"] = "現在",
-            ["status.default"] = "既定",
-            ["status.shell"] = "Shell",
-            ["status.ready"] = "準備完了。",
-            ["status.noStatus"] = "エージェントから状態が返されませんでした。",
-            ["error.unreachable"] = "localhost:47991 のエージェントに接続できません。",
-            ["error.unreadable"] = "エージェントの応答を読み取れませんでした。"
         }
     };
 
@@ -254,22 +150,46 @@ public static class L
 
     private static IEnumerable<string> GetLanguageCandidates()
     {
+        var configuredLanguage = ReadConfiguredLanguage();
+        if (!string.IsNullOrWhiteSpace(configuredLanguage))
+        {
+            yield return configuredLanguage;
+            yield return configuredLanguage.Split('-', StringSplitOptions.RemoveEmptyEntries)[0];
+        }
+
         var culture = CultureInfo.CurrentUICulture;
-        if (!string.IsNullOrWhiteSpace(culture.Name))
-        {
-            yield return culture.Name;
-        }
-
-        if (culture.Name.StartsWith("pt-BR", StringComparison.OrdinalIgnoreCase))
-        {
-            yield return "pt-BR";
-        }
-
         if (!string.IsNullOrWhiteSpace(culture.TwoLetterISOLanguageName))
         {
             yield return culture.TwoLetterISOLanguageName;
         }
 
         yield return "en";
+    }
+
+    private static string? ReadConfiguredLanguage()
+    {
+        try
+        {
+            var path = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "GamingMode",
+                "config.json");
+            if (!File.Exists(path))
+            {
+                return null;
+            }
+
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            if (document.RootElement.TryGetProperty("language", out var language) &&
+                language.ValueKind == JsonValueKind.String)
+            {
+                return language.GetString();
+            }
+        }
+        catch
+        {
+        }
+
+        return null;
     }
 }

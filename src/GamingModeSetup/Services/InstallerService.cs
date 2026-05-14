@@ -130,7 +130,8 @@ public sealed class InstallerService
                 options.DefaultMode,
                 options.HideDesktopShellInGamingMode,
                 options.EnsureInputCompatibility,
-                options.AutoHideMouseCursor);
+                options.AutoHideMouseCursor,
+                GamingModeSetup.L.CurrentLanguage);
 
             EnsureSunshineCompatibilityServices();
 

@@ -9,7 +9,8 @@ public static class ModeConfigWriter
         string mode,
         bool hideDesktopShellInGamingMode,
         bool ensureInputCompatibility,
-        bool autoHideMouseCursor)
+        bool autoHideMouseCursor,
+        string language)
     {
         var directory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -35,6 +36,7 @@ public static class ModeConfigWriter
             root = CreateDefaultConfig();
         }
 
+        root["language"] = language;
         root["defaultMode"] = mode;
         root["nextBootMode"] = null;
 
@@ -62,6 +64,7 @@ public static class ModeConfigWriter
         => new()
         {
             ["defaultMode"] = "Desktop",
+            ["language"] = "en",
             ["nextBootMode"] = null,
             ["gaming"] = new JsonObject
             {

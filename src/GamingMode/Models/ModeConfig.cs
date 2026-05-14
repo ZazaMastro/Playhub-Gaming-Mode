@@ -2,6 +2,8 @@ namespace GamingMode.Models;
 
 public sealed class ModeConfig
 {
+    public string? Language { get; set; }
+
     public ModeKind DefaultMode { get; set; } = ModeKind.Desktop;
 
     public ModeKind? NextBootMode { get; set; }
