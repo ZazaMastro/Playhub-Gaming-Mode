@@ -14,7 +14,7 @@ public sealed class LanguageWindow : Window
     {
         Title = "Gaming Mode";
         Width = 720;
-        Height = 540;
+        Height = 620;
         MinWidth = Width;
         MaxWidth = Width;
         MinHeight = Height;
@@ -122,7 +122,7 @@ public sealed class LanguageWindow : Window
         var grid = new UniformGrid
         {
             Columns = 2,
-            Rows = 3
+            Rows = (int)Math.Ceiling(L.SupportedLanguages.Length / 2.0)
         };
         panel.Child = grid;
 
