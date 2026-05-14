@@ -95,6 +95,16 @@ public sealed class AgentClient
 
     public Task<ApiResult?> SetDefaultDesktopAsync() => PostAsync("/default/desktop");
 
+    public async Task<ApiResult?> SetSplashLogoAsync(string? path)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            "/config/splash/logo",
+            new SplashLogoRequest { Path = path },
+            JsonOptions);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ApiResult>(JsonOptions);
+    }
+
     public Task<ApiResult?> RestartSteamAsync() => PostAsync("/restart/steam");
 
     public Task<ApiResult?> RestartDeckyAsync() => PostAsync("/restart/decky");

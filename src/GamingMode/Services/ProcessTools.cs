@@ -59,6 +59,20 @@ public sealed class ProcessTools
         ("BTAGService", "Bluetooth Audio Gateway Service")
     ];
 
+    private static readonly (string Name, string Label)[] DeckyPluginHelperCompatibilityServices =
+    [
+        ("Dnscache", "DNS Client"),
+        ("Dhcp", "DHCP Client"),
+        ("NlaSvc", "Network Location Awareness"),
+        ("netprofm", "Network List Service"),
+        ("Wcmsvc", "Windows Connection Manager"),
+        ("WinHttpAutoProxySvc", "WinHTTP Web Proxy Auto-Discovery Service"),
+        ("CryptSvc", "Cryptographic Services"),
+        ("BITS", "Background Intelligent Transfer Service"),
+        ("LanmanWorkstation", "Workstation"),
+        ("Winmgmt", "Windows Management Instrumentation")
+    ];
+
     private readonly FileLogger _logger;
 
     public ProcessTools(FileLogger logger)
@@ -82,6 +96,22 @@ public sealed class ProcessTools
     }
 
     public bool EnsureProcess(string? configuredPath, string[] fallbackPaths, string arguments, params string[] processNames)
+        => EnsureProcessCore(configuredPath, fallbackPaths, arguments, environment: null, processNames);
+
+    public bool EnsureProcessWithEnvironment(
+        string? configuredPath,
+        string[] fallbackPaths,
+        string arguments,
+        IReadOnlyDictionary<string, string> environment,
+        params string[] processNames)
+        => EnsureProcessCore(configuredPath, fallbackPaths, arguments, environment, processNames);
+
+    private bool EnsureProcessCore(
+        string? configuredPath,
+        string[] fallbackPaths,
+        string arguments,
+        IReadOnlyDictionary<string, string>? environment,
+        params string[] processNames)
     {
         if (GetState(processNames).Running)
         {
@@ -105,6 +135,14 @@ public sealed class ProcessTools
                 WorkingDirectory = Path.GetDirectoryName(path) ?? Environment.CurrentDirectory
             };
 
+            if (environment is not null)
+            {
+                foreach (var item in environment)
+                {
+                    info.Environment[item.Key] = item.Value;
+                }
+            }
+
             Process.Start(info);
             _logger.Info($"Started {path} {arguments}".Trim());
             return true;
@@ -114,6 +152,66 @@ public sealed class ProcessTools
             _logger.Error($"Failed to start {path}.", exception);
             return false;
         }
+    }
+
+    public int StartCustomGamingApps(IEnumerable<GamingStartupApp> apps)
+    {
+        var started = 0;
+
+        foreach (var app in apps.Where(app => app.Enabled))
+        {
+            if (string.IsNullOrWhiteSpace(app.Path))
+            {
+                _logger.Info($"Skipped custom gaming app {DisplayName(app)} because no path is configured.");
+                continue;
+            }
+
+            var path = Environment.ExpandEnvironmentVariables(app.Path).Trim().Trim('"');
+            if (!File.Exists(path))
+            {
+                _logger.Info($"Skipped custom gaming app {DisplayName(app)} because the path was not found: {path}.");
+                continue;
+            }
+
+            var processName = ResolveCustomProcessName(app, path);
+            if (!string.IsNullOrWhiteSpace(processName) && Process.GetProcessesByName(processName).Length > 0)
+            {
+                _logger.Info($"Skipped custom gaming app {DisplayName(app)} because {processName} is already running.");
+                continue;
+            }
+
+            try
+            {
+                var workingDirectory = Environment.ExpandEnvironmentVariables(app.WorkingDirectory ?? "").Trim().Trim('"');
+                if (string.IsNullOrWhiteSpace(workingDirectory) || !Directory.Exists(workingDirectory))
+                {
+                    workingDirectory = Path.GetDirectoryName(path) ?? Environment.CurrentDirectory;
+                }
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = path,
+                    Arguments = Environment.ExpandEnvironmentVariables(app.Arguments ?? ""),
+                    WorkingDirectory = workingDirectory,
+                    UseShellExecute = true,
+                    WindowStyle = app.StartMinimized ? ProcessWindowStyle.Minimized : ProcessWindowStyle.Normal
+                });
+
+                started++;
+                _logger.Info($"Started custom gaming app {DisplayName(app)}.");
+
+                if (app.DelayAfterStartMs > 0)
+                {
+                    Thread.Sleep(app.DelayAfterStartMs);
+                }
+            }
+            catch (Exception exception)
+            {
+                _logger.Error($"Failed to start custom gaming app {DisplayName(app)}.", exception);
+            }
+        }
+
+        return started;
     }
 
     public int CleanupDeckyOrphanedForks()
@@ -285,6 +383,41 @@ public sealed class ProcessTools
     public int EnsureSunshineCompatibilityServices()
         => EnsureServices(SunshineCompatibilityServices, "Sunshine compatibility");
 
+    public int EnsureDeckyPluginHelperCompatibilityServices()
+        => EnsureServices(DeckyPluginHelperCompatibilityServices, "Decky plugin helper compatibility");
+
+    public IReadOnlyDictionary<string, string> BuildDeckyPluginHelperEnvironment()
+    {
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var temp = Path.GetTempPath().TrimEnd('\\');
+        var homebrew = Path.Combine(userProfile, "homebrew");
+        var helperPaths = new[]
+        {
+            Path.Combine(homebrew, "plugins", "ThemeDeck"),
+            Path.Combine(homebrew, "plugins", "ThemeDeck", "bin"),
+            Path.Combine(homebrew, "services")
+        };
+
+        var environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["PATH"] = BuildDesktopLikePath(helperPaths),
+            ["Path"] = BuildDesktopLikePath(helperPaths),
+            ["USERPROFILE"] = userProfile,
+            ["HOME"] = userProfile,
+            ["APPDATA"] = appData,
+            ["LOCALAPPDATA"] = localAppData,
+            ["TEMP"] = temp,
+            ["TMP"] = temp,
+            ["PYTHONIOENCODING"] = "utf-8",
+            ["PYTHONUTF8"] = "1"
+        };
+
+        _logger.Info("Prepared Decky plugin helper environment for Gaming Mode.");
+        return environment;
+    }
+
     private int EnsureServices((string Name, string Label)[] services, string purpose)
     {
         var readyCount = 0;
@@ -454,6 +587,28 @@ public sealed class ProcessTools
         return !string.IsNullOrWhiteSpace(processName) &&
             Process.GetProcessesByName(processName).Length > 0;
     }
+
+    private static string ResolveCustomProcessName(GamingStartupApp app, string path)
+    {
+        if (!string.IsNullOrWhiteSpace(app.ProcessName))
+        {
+            return Path.GetFileNameWithoutExtension(app.ProcessName.Trim().Trim('"'));
+        }
+
+        if (Path.GetExtension(path).Equals(".lnk", StringComparison.OrdinalIgnoreCase))
+        {
+            var target = TryResolveShortcutTarget(path);
+            if (!string.IsNullOrWhiteSpace(target))
+            {
+                return Path.GetFileNameWithoutExtension(target);
+            }
+        }
+
+        return Path.GetFileNameWithoutExtension(path);
+    }
+
+    private static string DisplayName(GamingStartupApp app)
+        => string.IsNullOrWhiteSpace(app.Name) ? app.Path ?? "unnamed app" : app.Name;
 
     private static string? TryResolveShortcutTarget(string shortcutPath)
     {
@@ -631,6 +786,36 @@ public sealed class ProcessTools
     }
 
     public void RestartProcesses(string configuredPath, string fallbackPath, string arguments, bool killEntireProcessTree, params string[] processNames)
+        => RestartProcessesCore(
+            configuredPath,
+            fallbackPath,
+            arguments,
+            killEntireProcessTree,
+            null,
+            processNames);
+
+    public void RestartProcessesWithEnvironment(
+        string configuredPath,
+        string fallbackPath,
+        string arguments,
+        bool killEntireProcessTree,
+        IReadOnlyDictionary<string, string> environment,
+        params string[] processNames)
+        => RestartProcessesCore(
+            configuredPath,
+            fallbackPath,
+            arguments,
+            killEntireProcessTree,
+            environment,
+            processNames);
+
+    private void RestartProcessesCore(
+        string configuredPath,
+        string fallbackPath,
+        string arguments,
+        bool killEntireProcessTree,
+        IReadOnlyDictionary<string, string>? environment,
+        params string[] processNames)
     {
         foreach (var process in processNames.SelectMany(Process.GetProcessesByName).DistinctBy(process => process.Id))
         {
@@ -648,7 +833,14 @@ public sealed class ProcessTools
             }
         }
 
-        EnsureProcess(configuredPath, [fallbackPath], arguments, processNames);
+        if (environment is null)
+        {
+            EnsureProcess(configuredPath, [fallbackPath], arguments, processNames);
+        }
+        else
+        {
+            EnsureProcessWithEnvironment(configuredPath, [fallbackPath], arguments, environment, processNames);
+        }
     }
 
     public string[] GetSteamFallbackPaths()
@@ -697,6 +889,43 @@ public sealed class ProcessTools
     {
         var candidates = new[] { configuredPath ?? "" }.Concat(fallbackPaths);
         return candidates.FirstOrDefault(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path));
+    }
+
+    private static string BuildDesktopLikePath(IEnumerable<string> helperPaths)
+    {
+        var paths = new List<string>();
+        AddPathSegments(paths, helperPaths.Where(Directory.Exists));
+        AddPathSegments(paths, Environment.GetEnvironmentVariable("PATH"));
+        AddPathSegments(paths, Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.Machine));
+        AddPathSegments(paths, Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.User));
+
+        return string.Join(
+            Path.PathSeparator,
+            paths
+                .Select(Environment.ExpandEnvironmentVariables)
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static void AddPathSegments(ICollection<string> paths, IEnumerable<string> segments)
+    {
+        foreach (var segment in segments)
+        {
+            if (!string.IsNullOrWhiteSpace(segment))
+            {
+                paths.Add(segment.Trim().Trim('"'));
+            }
+        }
+    }
+
+    private static void AddPathSegments(ICollection<string> paths, string? pathValue)
+    {
+        if (string.IsNullOrWhiteSpace(pathValue))
+        {
+            return;
+        }
+
+        AddPathSegments(paths, pathValue.Split(Path.PathSeparator));
     }
 
     private int RunPowerShellInteger(string script, string operation)

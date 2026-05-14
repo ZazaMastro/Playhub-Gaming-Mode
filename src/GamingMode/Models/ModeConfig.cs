@@ -47,7 +47,41 @@ public sealed class GamingSettings
 
     public bool BorderlessFullscreenWindowsInGamingMode { get; set; } = true;
 
+    public List<GamingStartupApp> CustomStartupApps { get; set; } = [];
+
+    public GamingSplashSettings Splash { get; set; } = new();
+
     public bool ManageAudio { get; set; }
+}
+
+public sealed class GamingStartupApp
+{
+    public string Name { get; set; } = "";
+
+    public string? Path { get; set; }
+
+    public string Arguments { get; set; } = "";
+
+    public string? WorkingDirectory { get; set; }
+
+    public string? ProcessName { get; set; }
+
+    public bool Enabled { get; set; } = true;
+
+    public bool StartMinimized { get; set; } = true;
+
+    public int DelayAfterStartMs { get; set; }
+}
+
+public sealed class GamingSplashSettings
+{
+    public bool Enabled { get; set; } = true;
+
+    public string? LogoPath { get; set; }
+
+    public int MinVisibleMs { get; set; } = 1200;
+
+    public int MaxVisibleMs { get; set; } = 120000;
 }
 
 public sealed class SafetySettings

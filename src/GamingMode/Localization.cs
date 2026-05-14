@@ -15,6 +15,7 @@ public static class L
             ["desktop.mode"] = "Desktop Mode",
             ["gaming.mode"] = "Gaming Mode",
             ["config"] = "Config",
+            ["splash.logo"] = "Startup logo",
             ["agent.starting"] = "Starting local agent...",
             ["agent.ready"] = "Agent ready.",
             ["agent.unreachable"] = "Agent is not reachable on localhost:47991.",
@@ -29,12 +30,13 @@ public static class L
         ["it"] = new()
         {
             ["app.title"] = "Gaming Mode",
-            ["action.gaming"] = "Passa alla modalita Gaming",
-            ["action.desktop"] = "Passa alla modalita Desktop",
+            ["action.gaming"] = "Passa alla modalità Gaming",
+            ["action.desktop"] = "Passa alla modalità Desktop",
             ["default.startup"] = "Avvio predefinito",
-            ["desktop.mode"] = "Modalita Desktop",
-            ["gaming.mode"] = "Modalita Gaming",
+            ["desktop.mode"] = "Modalità Desktop",
+            ["gaming.mode"] = "Modalità Gaming",
             ["config"] = "Config",
+            ["splash.logo"] = "Logo avvio",
             ["agent.starting"] = "Avvio dell'agent locale...",
             ["agent.ready"] = "Agent pronto.",
             ["agent.unreachable"] = "Agent non raggiungibile su localhost:47991.",
@@ -44,7 +46,7 @@ public static class L
             ["status.ready"] = "Pronto.",
             ["status.noStatus"] = "L'agent non ha restituito uno stato.",
             ["error.unreachable"] = "Agent non raggiungibile su localhost:47991.",
-            ["error.unreadable"] = "La risposta dell'agent non puo essere letta."
+            ["error.unreadable"] = "La risposta dell'agent non può essere letta."
         },
         ["es"] = new()
         {
@@ -55,6 +57,7 @@ public static class L
             ["desktop.mode"] = "Modo Escritorio",
             ["gaming.mode"] = "Modo Gaming",
             ["config"] = "Config",
+            ["splash.logo"] = "Logo",
             ["agent.starting"] = "Iniciando agente local...",
             ["agent.ready"] = "Agente listo.",
             ["agent.unreachable"] = "No se puede contactar el agente en localhost:47991.",
@@ -75,6 +78,7 @@ public static class L
             ["desktop.mode"] = "Mode Bureau",
             ["gaming.mode"] = "Mode Gaming",
             ["config"] = "Config",
+            ["splash.logo"] = "Logo",
             ["agent.starting"] = "Demarrage de l'agent local...",
             ["agent.ready"] = "Agent pret.",
             ["agent.unreachable"] = "Agent injoignable sur localhost:47991.",
@@ -95,6 +99,7 @@ public static class L
             ["desktop.mode"] = "Desktop-Modus",
             ["gaming.mode"] = "Gaming-Modus",
             ["config"] = "Config",
+            ["splash.logo"] = "Logo",
             ["agent.starting"] = "Lokalen Agent starten...",
             ["agent.ready"] = "Agent bereit.",
             ["agent.unreachable"] = "Agent ist auf localhost:47991 nicht erreichbar.",
@@ -115,6 +120,7 @@ public static class L
             ["desktop.mode"] = "Modo Desktop",
             ["gaming.mode"] = "Modo Gaming",
             ["config"] = "Config",
+            ["splash.logo"] = "Logo",
             ["agent.starting"] = "A iniciar agente local...",
             ["agent.ready"] = "Agente pronto.",
             ["agent.unreachable"] = "Agente indisponivel em localhost:47991.",

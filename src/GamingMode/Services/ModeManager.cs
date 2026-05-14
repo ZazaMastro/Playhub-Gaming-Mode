@@ -181,11 +181,13 @@ public sealed class ModeManager
     {
         var config = _store.LoadConfig();
         _processTools.CleanupDeckyOrphanedForks();
-        _processTools.RestartProcesses(
+        _processTools.EnsureDeckyPluginHelperCompatibilityServices();
+        _processTools.RestartProcessesWithEnvironment(
             config.Gaming.DeckyPath ?? "",
             _processTools.GetDeckyFallbackPaths().FirstOrDefault() ?? "",
             "",
-            killEntireProcessTree: true,
+            true,
+            _processTools.BuildDeckyPluginHelperEnvironment(),
             "PluginLoader",
             "PluginLoader_noconsole");
         _processTools.CleanupDeckyOrphanedForks();
@@ -212,6 +214,7 @@ public sealed class ModeManager
             Explorer = _processTools.GetState("explorer"),
             MouseCursorAutoHide = _cursorAutoHide.Running,
             MouseCursorHidden = _cursorAutoHide.CursorHidden,
+            SplashLogoPath = config.Gaming.Splash.LogoPath,
             ConfigPath = _paths.ConfigPath,
             Messages = messages?.ToArray() ?? []
         };
@@ -297,6 +300,14 @@ public sealed class ModeManager
             messages.Add($"DirectInput compatibility checked ({readyServices} service(s) ready).");
         }
 
+        _processTools.EnsureDeckyPluginHelperCompatibilityServices();
+
+        var customAppsStarted = _processTools.StartCustomGamingApps(config.Gaming.CustomStartupApps);
+        if (customAppsStarted > 0)
+        {
+            messages.Add($"Started {customAppsStarted} custom gaming app(s).");
+        }
+
         if (shouldHideDesktopShell)
         {
             _processTools.StopExplorer();
@@ -317,11 +328,13 @@ public sealed class ModeManager
         if (config.Gaming.DeckyRequired)
         {
             _processTools.CleanupDeckyOrphanedForks();
+            var deckyEnvironment = _processTools.BuildDeckyPluginHelperEnvironment();
 
-            var started = _processTools.EnsureProcess(
+            var started = _processTools.EnsureProcessWithEnvironment(
                 config.Gaming.DeckyPath,
                 _processTools.GetDeckyFallbackPaths(),
                 "",
+                deckyEnvironment,
                 "PluginLoader",
                 "PluginLoader_noconsole");
 

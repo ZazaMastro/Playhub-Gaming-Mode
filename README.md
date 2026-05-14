@@ -7,20 +7,28 @@ PC. It keeps the current Windows user account and switches between two shells:
 - Gaming Mode: a controller-first Steam Big Picture session with Sunshine and
   Decky Loader prepared before Steam starts (so you can also turn on your PC and stream it wherever you want with Moonlight).
 
-The goal is a cleaner couch gaming experience without Windows bullshit services (except for the gaming ones obviously).
+The goal is a cleaner couch gaming experience while keeping the Windows services
+needed for gaming, streaming, audio, display, and input.
 
 ## Features
 
 - a GUI installer and a Companion app.
 - Steam Big Picture startup with Decky Loader launched first to avoid loading issues.
 - Sunshine startup and service preparation for streaming.
+- Optional custom background apps for tools such as MSI Afterburner, AutoActions,
+  HDR utilities, fan tools, overlays, or controller helpers.
+- Desktop-like Decky plugin helper environment for bundled tools such as
+  `yt-dlp.exe`, `ffmpeg.exe`, `ffprobe.exe`, `curl.exe`, and `wget.exe`.
 - Input compatibility preparation for HID, Bluetooth, GameInput, Xbox GIP,
   Steam Input, DirectInput, and `dinput8.dll` wrappers.
-- Idle mouse cursor hiding in Gaming Mode (this is a cool one if you don't want that damn thing around when using a controller).
-- Focus borderless fullscreen handling for foreground game windows (similar to SteamOS / Bazzite Gaming Mode). Important system windows are out of this for obvious reasons.
+- Idle mouse cursor hiding in Gaming Mode.
+- Borderless fullscreen handling for visible game/app windows in Gaming Mode.
+- Black shell splash screen with a centered logo while Gaming Mode starts after
+  Windows sign-in. The splash fades only after Steam Big Picture is detected as
+  fullscreen.
 - Automatic cleanup of orphaned Decky Loader PyInstaller child processes.
 - A Decky companion plugin to do everything with your gamepad.
-- Keep pressed the Shift key during sign-in to force Desktop Mode (just a security thing).
+- Hold the Shift key during sign-in to force Desktop Mode.
 
 ## Requirements
 
@@ -63,10 +71,12 @@ Windows will start the selected shell, that's it.
 Gaming Mode startup order:
 
 1. Sunshine compatibility services.
-2. Sunshine.
-3. Decky Loader from `%USERPROFILE%\homebrew\services\PluginLoader_noconsole.exe`.
-4. Input compatibility services.
-5. Steam Big Picture.
+2. Input compatibility services.
+3. Decky plugin helper compatibility.
+4. Custom background apps.
+5. Sunshine.
+6. Decky Loader from `%USERPROFILE%\homebrew\services\PluginLoader_noconsole.exe`.
+7. Steam Big Picture.
 
 ## Safety
 
@@ -112,6 +122,24 @@ Useful fields:
     "autoHideMouseCursorInGamingMode": true,
     "autoHideMouseCursorAfterMs": 2200,
     "borderlessFullscreenWindowsInGamingMode": true,
+    "customStartupApps": [
+      {
+        "name": "MSI Afterburner",
+        "path": "C:\\Program Files (x86)\\MSI Afterburner\\MSIAfterburner.exe",
+        "arguments": "",
+        "workingDirectory": null,
+        "processName": "MSIAfterburner",
+        "enabled": true,
+        "startMinimized": true,
+        "delayAfterStartMs": 0
+      }
+    ],
+    "splash": {
+      "enabled": true,
+      "logoPath": null,
+      "minVisibleMs": 1200,
+      "maxVisibleMs": 120000
+    },
     "manageAudio": false
   },
   "safety": {
@@ -124,6 +152,13 @@ Useful fields:
 
 Leave paths as `null` to use automatic discovery. Set explicit paths only when
 Steam, Decky Loader, or Sunshine are installed in custom locations.
+
+`customStartupApps` is optional. Add one entry for each app that must run in
+Gaming Mode before Steam starts. `processName` prevents duplicate launches.
+
+The splash logo defaults to the bundled Playhub logo. Use the companion app
+startup logo selector to choose Playhub, ASUS, Lenovo, MSI, PlayStation, ROG,
+Steam Deck, SteamOS, or Xbox.
 
 ## Decky Plugin
 

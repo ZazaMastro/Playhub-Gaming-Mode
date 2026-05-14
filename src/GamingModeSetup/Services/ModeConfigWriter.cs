@@ -47,6 +47,8 @@ public static class ModeConfigWriter
         gaming["autoHideMouseCursorInGamingMode"] = autoHideMouseCursor;
         gaming["autoHideMouseCursorAfterMs"] = 2200;
         gaming["borderlessFullscreenWindowsInGamingMode"] = true;
+        gaming["customStartupApps"] ??= new JsonArray();
+        gaming["splash"] ??= CreateDefaultSplash();
         gaming["restoreStartupAppsOnDesktop"] = false;
         gaming["openSteamDesktopOnInteractiveDesktopMode"] = false;
 
@@ -80,6 +82,8 @@ public static class ModeConfigWriter
                 ["autoHideMouseCursorInGamingMode"] = true,
                 ["autoHideMouseCursorAfterMs"] = 2200,
                 ["borderlessFullscreenWindowsInGamingMode"] = true,
+                ["customStartupApps"] = new JsonArray(),
+                ["splash"] = CreateDefaultSplash(),
                 ["manageAudio"] = false
             },
             ["safety"] = new JsonObject
@@ -88,5 +92,14 @@ public static class ModeConfigWriter
                 ["allowRemoteApi"] = false,
                 ["restartWithoutPrompt"] = true
             }
+        };
+
+    private static JsonObject CreateDefaultSplash()
+        => new()
+        {
+            ["enabled"] = true,
+            ["logoPath"] = null,
+            ["minVisibleMs"] = 1200,
+            ["maxVisibleMs"] = 120000
         };
 }

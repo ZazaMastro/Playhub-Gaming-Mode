@@ -28,6 +28,8 @@ public sealed class ModeStatus
 
     public bool MouseCursorHidden { get; set; }
 
+    public string? SplashLogoPath { get; set; }
+
     public string ConfigPath { get; set; } = "";
 
     public string[] Messages { get; set; } = [];
@@ -55,4 +57,9 @@ public sealed class ApiResult
 
     public static ApiResult Failure(string message, ModeStatus? status = null)
         => new() { Ok = false, Message = message, Status = status };
+}
+
+public sealed class SplashLogoRequest
+{
+    public string? Path { get; set; }
 }

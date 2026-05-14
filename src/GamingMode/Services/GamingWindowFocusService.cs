@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -14,14 +15,19 @@ public sealed class GamingWindowFocusService : IDisposable
         "steamwebhelper",
         "sunshine",
         "PluginLoader",
-        "PluginLoader_noconsole"
+        "PluginLoader_noconsole",
+        "yt-dlp",
+        "ffmpeg",
+        "ffprobe",
+        "curl",
+        "wget"
     };
 
     private readonly FileLogger _logger;
     private readonly object _sync = new();
+    private readonly ConcurrentDictionary<nint, AppliedWindowState> _appliedWindows = new();
     private CancellationTokenSource? _cancellation;
     private Task? _worker;
-    private nint _lastWindow;
 
     public GamingWindowFocusService(FileLogger logger)
     {
@@ -65,7 +71,7 @@ public sealed class GamingWindowFocusService : IDisposable
             worker = _worker;
             _cancellation = null;
             _worker = null;
-            _lastWindow = 0;
+            _appliedWindows.Clear();
         }
 
         if (cancellation is null)
@@ -99,39 +105,43 @@ public sealed class GamingWindowFocusService : IDisposable
         {
             try
             {
-                ApplyToForegroundWindow();
+                ApplyToCandidateWindows();
             }
             catch (Exception exception)
             {
-                _logger.Error("Failed to apply borderless fullscreen to foreground window.", exception);
+                _logger.Error("Failed to apply borderless fullscreen to game windows.", exception);
             }
 
             await Task.Delay(350, cancellationToken);
         }
     }
 
-    private void ApplyToForegroundWindow()
+    private void ApplyToCandidateWindows()
     {
-        var window = GetForegroundWindow();
-        if (window == 0 || window == _lastWindow || !IsWindowVisible(window))
+        var seen = new HashSet<nint>();
+        foreach (var window in EnumerateWindows())
         {
-            return;
+            seen.Add(window);
+
+            try
+            {
+                ApplyToWindow(window);
+            }
+            catch (Exception exception)
+            {
+                _logger.Error($"Failed to apply borderless fullscreen to window {window}.", exception);
+            }
         }
 
-        GetWindowThreadProcessId(window, out var processId);
-        if (processId == 0)
+        foreach (var window in _appliedWindows.Keys.Where(window => !seen.Contains(window)).ToArray())
         {
-            return;
+            _appliedWindows.TryRemove(window, out _);
         }
+    }
 
-        using var process = Process.GetProcessById((int)processId);
-        if (IgnoredProcesses.Contains(process.ProcessName))
-        {
-            return;
-        }
-
-        var style = GetWindowLongPtr(window, GwlStyle).ToInt64();
-        if ((style & WsChild) != 0 || (style & WsDisabled) != 0 || (style & WsVisible) == 0)
+    private void ApplyToWindow(nint window)
+    {
+        if (!IsCandidateWindow(window, out var processId, out var processName))
         {
             return;
         }
@@ -143,14 +153,21 @@ public sealed class GamingWindowFocusService : IDisposable
             return;
         }
 
+        var style = GetWindowLongPtr(window, GwlStyle).ToInt64();
         var newStyle = style & ~(WsCaption | WsThickFrame | WsMinimizeBox | WsMaximizeBox | WsSysMenu);
-        SetWindowLongPtr(window, GwlStyle, new nint(newStyle));
-
         var exStyle = GetWindowLongPtr(window, GwlExStyle).ToInt64();
         var newExStyle = exStyle & ~(WsExDlgModalFrame | WsExClientEdge | WsExStaticEdge);
-        SetWindowLongPtr(window, GwlExStyle, new nint(newExStyle));
 
         var rect = monitorInfo.rcMonitor;
+        var targetState = new AppliedWindowState(rect, newStyle, newExStyle);
+        if (_appliedWindows.TryGetValue(window, out var previousState) && previousState.Equals(targetState))
+        {
+            return;
+        }
+
+        SetWindowLongPtr(window, GwlStyle, new nint(newStyle));
+        SetWindowLongPtr(window, GwlExStyle, new nint(newExStyle));
+
         SetWindowPos(
             window,
             HwndTop,
@@ -158,10 +175,70 @@ public sealed class GamingWindowFocusService : IDisposable
             rect.Top,
             rect.Right - rect.Left,
             rect.Bottom - rect.Top,
-            SwpNoOwnerZOrder | SwpFrameChanged | SwpShowWindow);
+            SwpNoZOrder | SwpNoActivate | SwpNoOwnerZOrder | SwpFrameChanged | SwpShowWindow);
 
-        _lastWindow = window;
-        _logger.Info($"Applied borderless fullscreen to {process.ProcessName} ({processId}).");
+        _appliedWindows[window] = targetState;
+        _logger.Info($"Applied borderless fullscreen to {processName} ({processId}).");
+    }
+
+    private static bool IsCandidateWindow(nint window, out uint processId, out string processName)
+    {
+        processId = 0;
+        processName = "";
+
+        if (window == 0 || !IsWindowVisible(window) || IsIconic(window))
+        {
+            return false;
+        }
+
+        if (!GetWindowRect(window, out var currentRect))
+        {
+            return false;
+        }
+
+        var currentWidth = currentRect.Right - currentRect.Left;
+        var currentHeight = currentRect.Bottom - currentRect.Top;
+        if (currentWidth < 220 || currentHeight < 120)
+        {
+            return false;
+        }
+
+        GetWindowThreadProcessId(window, out processId);
+        if (processId == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            using var process = Process.GetProcessById((int)processId);
+            processName = process.ProcessName;
+        }
+        catch
+        {
+            return false;
+        }
+
+        if (IgnoredProcesses.Contains(processName))
+        {
+            return false;
+        }
+
+        var style = GetWindowLongPtr(window, GwlStyle).ToInt64();
+        return (style & WsChild) == 0 &&
+            (style & WsDisabled) == 0 &&
+            (style & WsVisible) != 0;
+    }
+
+    private static IReadOnlyList<nint> EnumerateWindows()
+    {
+        var windows = new List<nint>();
+        EnumWindows((window, _) =>
+        {
+            windows.Add(window);
+            return true;
+        }, 0);
+        return windows;
     }
 
     private const int GwlStyle = -16;
@@ -177,6 +254,8 @@ public sealed class GamingWindowFocusService : IDisposable
     private const long WsExDlgModalFrame = 0x00000001L;
     private const long WsExClientEdge = 0x00000200L;
     private const long WsExStaticEdge = 0x00020000L;
+    private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpNoActivate = 0x0010;
     private const uint SwpNoOwnerZOrder = 0x0200;
     private const uint SwpFrameChanged = 0x0020;
     private const uint SwpShowWindow = 0x0040;
@@ -184,10 +263,18 @@ public sealed class GamingWindowFocusService : IDisposable
     private static readonly nint HwndTop = 0;
 
     [DllImport("user32.dll")]
-    private static extern nint GetForegroundWindow();
+    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, nint lParam);
+
+    private delegate bool EnumWindowsProc(nint hWnd, nint lParam);
 
     [DllImport("user32.dll")]
     private static extern bool IsWindowVisible(nint hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(nint hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(nint hWnd, out Rect lpRect);
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(nint hWnd, out uint processId);
@@ -215,6 +302,8 @@ public sealed class GamingWindowFocusService : IDisposable
         public int Right;
         public int Bottom;
     }
+
+    private readonly record struct AppliedWindowState(Rect Rect, long Style, long ExStyle);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     private struct MonitorInfo

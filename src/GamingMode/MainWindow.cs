@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -20,7 +21,10 @@ public sealed class MainWindow : Window
     private readonly AgentClient _client = new();
     private readonly TextBlock _messageLabel = Text("", 14, FontWeights.Normal, Muted);
     private readonly ModeSegment _defaultMode = new(L.T("desktop.mode"), L.T("gaming.mode"));
+    private readonly LogoDropdown _logoSelector = new();
+    private readonly Image _logoPreview = new();
     private readonly DispatcherTimer _timer = new();
+    private IReadOnlyList<LogoChoice> _logoChoices = [];
     private bool _updating;
 
     public MainWindow()
@@ -79,9 +83,13 @@ public sealed class MainWindow : Window
         grid.Children.Add(defaults);
         Grid.SetRow(defaults, 2);
 
+        var logoSelector = CreateSplashLogoSelector();
+        grid.Children.Add(logoSelector);
+        Grid.SetRow(logoSelector, 3);
+
         var footer = CreateFooter();
         grid.Children.Add(footer);
-        Grid.SetRow(footer, 3);
+        Grid.SetRow(footer, 4);
 
         return shell;
     }
@@ -192,6 +200,66 @@ public sealed class MainWindow : Window
         return panel;
     }
 
+    private UIElement CreateSplashLogoSelector()
+    {
+        var panel = new Border
+        {
+            Background = Ink,
+            CornerRadius = new CornerRadius(32),
+            Padding = new Thickness(30, 20, 30, 20),
+            Margin = new Thickness(0, 0, 0, 22)
+        };
+
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(240) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        panel.Child = row;
+
+        var label = Text(L.T("splash.logo"), 20, FontWeights.Bold, Paper);
+        label.VerticalAlignment = VerticalAlignment.Center;
+        row.Children.Add(label);
+
+        _logoChoices = LoadLogoChoices();
+        _logoSelector.Width = 360;
+        _logoSelector.Height = 50;
+        _logoSelector.SetItems(_logoChoices);
+        _logoSelector.SelectedChanged += async (_, _) =>
+        {
+            if (_updating || _logoSelector.Selected is null)
+            {
+                return;
+            }
+
+            UpdateLogoPreview(_logoSelector.Selected);
+            await RunActionAsync(() => _client.SetSplashLogoAsync(_logoSelector.Selected.Path));
+        };
+        row.Children.Add(_logoSelector);
+        Grid.SetColumn(_logoSelector, 1);
+
+        var preview = new Border
+        {
+            Width = 150,
+            Height = 50,
+            CornerRadius = new CornerRadius(25),
+            Background = Brushes.Black,
+            Padding = new Thickness(20, 10, 20, 10),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Child = _logoPreview
+        };
+        row.Children.Add(preview);
+        Grid.SetColumn(preview, 2);
+
+        var defaultChoice = _logoChoices.FirstOrDefault();
+        if (defaultChoice is not null)
+        {
+            _logoSelector.SetSelected(defaultChoice);
+            UpdateLogoPreview(defaultChoice);
+        }
+
+        return panel;
+    }
+
     private UIElement CreateFooter()
     {
         var row = new Grid();
@@ -204,15 +272,22 @@ public sealed class MainWindow : Window
         _messageLabel.VerticalAlignment = VerticalAlignment.Center;
         row.Children.Add(_messageLabel);
 
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+
         var config = new ActionPill(L.T("config"), Paper, Ink)
         {
             Width = 140,
-            Height = 52,
-            Margin = new Thickness(20, 0, 0, 0)
+            Height = 52
         };
         config.Click += (_, _) => OpenConfigFolder();
-        row.Children.Add(config);
-        Grid.SetColumn(config, 1);
+        buttons.Children.Add(config);
+
+        row.Children.Add(buttons);
+        Grid.SetColumn(buttons, 1);
         return row;
     }
 
@@ -262,6 +337,7 @@ public sealed class MainWindow : Window
 
             _updating = true;
             _defaultMode.SelectedMode = status.DefaultMode == ModeKind.Gaming ? "Gaming" : "Desktop";
+            SetSelectedLogo(status.SplashLogoPath);
             _updating = false;
         }
         catch (Exception exception)
@@ -283,6 +359,98 @@ public sealed class MainWindow : Window
             FileName = path,
             UseShellExecute = true
         });
+    }
+
+    private void SetSelectedLogo(string? configuredPath)
+    {
+        var choice = FindLogoChoice(configuredPath);
+        _logoSelector.SetSelected(choice);
+        UpdateLogoPreview(choice);
+    }
+
+    private LogoChoice FindLogoChoice(string? configuredPath)
+    {
+        if (string.IsNullOrWhiteSpace(configuredPath))
+        {
+            return _logoChoices.FirstOrDefault() ?? LogoChoice.Playhub;
+        }
+
+        var expanded = Environment.ExpandEnvironmentVariables(configuredPath).Trim().Trim('"');
+        foreach (var choice in _logoChoices)
+        {
+            if (choice.Path is null)
+            {
+                continue;
+            }
+
+            if (PathsEqual(choice.Path, expanded))
+            {
+                return choice;
+            }
+        }
+
+        return _logoChoices.FirstOrDefault() ?? LogoChoice.Playhub;
+    }
+
+    private void UpdateLogoPreview(LogoChoice choice)
+    {
+        _logoPreview.Source = choice.Path is null
+            ? LoadImage("base-logo.png")
+            : LoadImageFromPath(choice.Path);
+        _logoPreview.Stretch = Stretch.Uniform;
+    }
+
+    private static IReadOnlyList<LogoChoice> LoadLogoChoices()
+    {
+        var choices = new List<LogoChoice> { LogoChoice.Playhub };
+        var logoDir = System.IO.Path.Combine(AppContext.BaseDirectory, "assets", "logos");
+        if (!Directory.Exists(logoDir))
+        {
+            return choices;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(logoDir, "*.png").OrderBy(System.IO.Path.GetFileName))
+        {
+            choices.Add(new LogoChoice(LogoDisplayName(file), file));
+        }
+
+        return choices;
+    }
+
+    private static string LogoDisplayName(string path)
+    {
+        var name = System.IO.Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
+        return name switch
+        {
+            "asus" => "ASUS",
+            "lenovo" => "Lenovo",
+            "msi" => "MSI",
+            "playstation" => "PlayStation",
+            "rog" => "ROG",
+            "steam-deck" => "Steam Deck",
+            "steamos" => "SteamOS",
+            "xbox" => "Xbox",
+            _ => CultureName(name)
+        };
+    }
+
+    private static string CultureName(string name)
+        => string.Join(" ", name.Split('-', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => part.Length == 0 ? part : char.ToUpperInvariant(part[0]) + part[1..]));
+
+    private static bool PathsEqual(string first, string second)
+    {
+        try
+        {
+            return string.Equals(
+                System.IO.Path.GetFullPath(first),
+                System.IO.Path.GetFullPath(second),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return string.Equals(first, second, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     private static string FriendlyError(Exception exception)
@@ -316,7 +484,7 @@ public sealed class MainWindow : Window
     {
         while (current is not null)
         {
-            if (current is ChromeButton or ActionPill or ModeSegment)
+            if (current is ChromeButton or ActionPill or ModeSegment or LogoDropdown)
             {
                 return true;
             }
@@ -340,16 +508,173 @@ public sealed class MainWindow : Window
     private static ImageSource? LoadImage(string fileName)
     {
         var path = System.IO.Path.Combine(AppContext.BaseDirectory, "assets", fileName);
+        return LoadImageFromPath(path);
+    }
+
+    private static ImageSource? LoadImageFromPath(string path)
+    {
         if (!File.Exists(path))
         {
             return null;
         }
 
-        return new BitmapImage(new Uri(path));
+        var image = new BitmapImage();
+        image.BeginInit();
+        image.CacheOption = BitmapCacheOption.OnLoad;
+        image.UriSource = new Uri(path, UriKind.Absolute);
+        image.EndInit();
+        image.Freeze();
+        return image;
     }
 
     private static SolidColorBrush Brush(string hex)
         => new((Color)ColorConverter.ConvertFromString(hex));
+}
+
+public sealed record LogoChoice(string Name, string? Path)
+{
+    public static LogoChoice Playhub { get; } = new("Playhub", null);
+}
+
+public sealed class LogoDropdown : Border
+{
+    private readonly TextBlock _label;
+    private readonly Popup _popup;
+    private readonly StackPanel _itemsHost;
+    private IReadOnlyList<LogoChoice> _items = [];
+    private LogoChoice? _selected;
+
+    public LogoDropdown()
+    {
+        Background = AppBrushes.Paper;
+        BorderBrush = AppBrushes.Paper;
+        BorderThickness = new Thickness(2);
+        CornerRadius = new CornerRadius(25);
+        Cursor = Cursors.Hand;
+        Padding = new Thickness(24, 0, 16, 0);
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Child = grid;
+
+        _label = new TextBlock
+        {
+            FontSize = 16,
+            FontWeight = FontWeights.Bold,
+            Foreground = AppBrushes.Ink,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        grid.Children.Add(_label);
+
+        var chevron = new TextBlock
+        {
+            Text = "v",
+            FontSize = 16,
+            FontWeight = FontWeights.Black,
+            Foreground = AppBrushes.Ink,
+            Margin = new Thickness(16, 0, 0, 1),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        grid.Children.Add(chevron);
+        Grid.SetColumn(chevron, 1);
+
+        _itemsHost = new StackPanel();
+        _popup = new Popup
+        {
+            PlacementTarget = this,
+            Placement = PlacementMode.Bottom,
+            AllowsTransparency = true,
+            StaysOpen = false,
+            PopupAnimation = PopupAnimation.Fade,
+            Child = new Border
+            {
+                Background = AppBrushes.Paper,
+                BorderBrush = AppBrushes.Ink,
+                BorderThickness = new Thickness(1.4),
+                CornerRadius = new CornerRadius(22),
+                Padding = new Thickness(5),
+                Margin = new Thickness(0, 6, 0, 0),
+                Child = _itemsHost
+            }
+        };
+
+        MouseLeftButtonUp += (_, eventArgs) =>
+        {
+            eventArgs.Handled = true;
+            if (_popup.Child is FrameworkElement popupContent)
+            {
+                popupContent.Width = ActualWidth;
+            }
+
+            _popup.IsOpen = !_popup.IsOpen;
+        };
+    }
+
+    public event EventHandler? SelectedChanged;
+
+    public LogoChoice? Selected => _selected;
+
+    public void SetItems(IReadOnlyList<LogoChoice> items)
+    {
+        _items = items;
+        RebuildItems();
+        if (_selected is null && _items.Count > 0)
+        {
+            SetSelected(_items[0]);
+        }
+    }
+
+    public void SetSelected(LogoChoice choice, bool notify = false)
+    {
+        var changed = _selected is null || !Equals(_selected, choice);
+        _selected = choice;
+        _label.Text = choice.Name;
+        RebuildItems();
+
+        if (notify && changed)
+        {
+            SelectedChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void RebuildItems()
+    {
+        _itemsHost.Children.Clear();
+        foreach (var choice in _items)
+        {
+            var selected = _selected is not null && Equals(_selected, choice);
+            var item = new Border
+            {
+                Height = 42,
+                CornerRadius = new CornerRadius(18),
+                Padding = new Thickness(18, 0, 18, 0),
+                Margin = new Thickness(0, 1, 0, 1),
+                Background = selected ? AppBrushes.Yellow : AppBrushes.Paper,
+                Cursor = Cursors.Hand,
+                Child = new TextBlock
+                {
+                    Text = choice.Name,
+                    FontSize = 15,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = AppBrushes.Ink,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                }
+            };
+
+            item.MouseLeftButtonUp += (_, eventArgs) =>
+            {
+                eventArgs.Handled = true;
+                _popup.IsOpen = false;
+                SetSelected(choice, notify: true);
+            };
+            item.MouseEnter += (_, _) => item.Opacity = 0.84;
+            item.MouseLeave += (_, _) => item.Opacity = 1;
+            _itemsHost.Children.Add(item);
+        }
+    }
 }
 
 public sealed class ActionPill : Border

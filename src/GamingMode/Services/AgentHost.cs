@@ -24,8 +24,8 @@ public static class AgentHost
         var shellTools = new ShellTools(logger);
         using var cursorAutoHide = new CursorAutoHideService(logger);
         using var windowFocus = new GamingWindowFocusService(logger);
+        using var splashScreen = new SplashScreenService(logger);
         var manager = new ModeManager(paths, store, processTools, shellTools, cursorAutoHide, windowFocus, logger);
-        processTools.CleanupDeckyOrphanedForks();
         var config = store.LoadConfig();
         var bindAddress = config.Safety.AllowRemoteApi ? "0.0.0.0" : "127.0.0.1";
         var url = $"http://{bindAddress}:{config.Safety.ApiPort}";
@@ -36,14 +36,44 @@ public static class AgentHost
 
         if (shouldApplyBootMode)
         {
+            var showSplash = isShellHost &&
+                (config.NextBootMode ?? config.DefaultMode) == ModeKind.Gaming &&
+                !SafeModeGuard.ShouldForceDesktop(paths);
+            var minSplashVisibleMs = Math.Clamp(config.Gaming.Splash.MinVisibleMs, 0, 120000);
+            var maxSplashVisibleMs = Math.Clamp(config.Gaming.Splash.MaxVisibleMs, 60000, 300000);
+            var waitForSteamFullscreen = false;
+
+            if (showSplash)
+            {
+                splashScreen.Show(config.Gaming.Splash);
+            }
+
             try
             {
+                processTools.CleanupDeckyOrphanedForks();
                 await manager.ApplyBootModeAsync(isShellHost);
+                waitForSteamFullscreen = true;
             }
             catch (Exception exception)
             {
                 logger.Error("Boot mode application failed. Continuing agent startup in Desktop-safe state.", exception);
             }
+            finally
+            {
+                if (showSplash)
+                {
+                    if (waitForSteamFullscreen && manager.GetStatus().Steam.Running)
+                    {
+                        await SteamFullscreenDetector.WaitForFullscreenAsync(TimeSpan.FromMilliseconds(maxSplashVisibleMs), logger);
+                    }
+
+                    await splashScreen.HideAsync(minSplashVisibleMs, fade: true);
+                }
+            }
+        }
+        else
+        {
+            processTools.CleanupDeckyOrphanedForks();
         }
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -86,6 +116,26 @@ public static class AgentHost
         app.MapPost("/mode/desktop/restart", () => Results.Json(manager.RestartInMode(ModeKind.Desktop)));
         app.MapPost("/default/gaming", () => Results.Json(manager.SetDefaultMode(ModeKind.Gaming)));
         app.MapPost("/default/desktop", () => Results.Json(manager.SetDefaultMode(ModeKind.Desktop)));
+        app.MapPost("/config/splash/logo", (SplashLogoRequest request) =>
+        {
+            var config = store.LoadConfig();
+            if (string.IsNullOrWhiteSpace(request.Path))
+            {
+                config.Gaming.Splash.LogoPath = null;
+                store.SaveConfig(config);
+                return Results.Json(ApiResult.Success("Splash logo reset.", manager.GetStatus()));
+            }
+
+            var logoPath = Environment.ExpandEnvironmentVariables(request.Path).Trim().Trim('"');
+            if (!File.Exists(logoPath))
+            {
+                return Results.Json(ApiResult.Failure("Splash logo file was not found.", manager.GetStatus()));
+            }
+
+            config.Gaming.Splash.LogoPath = logoPath;
+            store.SaveConfig(config);
+            return Results.Json(ApiResult.Success("Splash logo updated.", manager.GetStatus()));
+        });
         app.MapPost("/restart/steam", async () => Results.Json(await manager.RestartSteamAsync()));
         app.MapPost("/restart/decky", async () => Results.Json(await manager.RestartDeckyAsync()));
         app.MapPost("/cursor/autohide/start", () =>
@@ -103,6 +153,7 @@ public static class AgentHost
         app.Lifetime.ApplicationStopped.Register(() => logger.Info("Agent stopped."));
         app.Lifetime.ApplicationStopping.Register(cursorAutoHide.Stop);
         app.Lifetime.ApplicationStopping.Register(windowFocus.Stop);
+        app.Lifetime.ApplicationStopping.Register(splashScreen.Dispose);
         _ = Task.Run(async () =>
         {
             try
